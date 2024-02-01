@@ -21,13 +21,13 @@ def calculate_statistics(token_dict, extract_metadata=True):
         all_tokens.extend(tokens_list)
 
     # Ajouter les statistiques globales (à l'exception de total_documents déjà ajouté)
-    global_stats = calculate_text_statistics(all_tokens)
+    global_stats = calculate_tokens_statistics(all_tokens)
     global_stats.pop('nb_documents', None)  # Retirer total_documents si présent
     statistics['global'].update(global_stats)
 
     # Calculer les statistiques pour chaque catégorie de tokens
     for key, tokens_list in token_dict.items():
-        statistics[key] = calculate_text_statistics(tokens_list)
+        statistics[key] = calculate_tokens_statistics(tokens_list)
 
     print("Statistiques sur les données :")
     print(json.dumps(statistics, indent=2))
@@ -36,7 +36,7 @@ def calculate_statistics(token_dict, extract_metadata=True):
     if extract_metadata:
         save_metadata_to_file(statistics, 'data/output/metadata.json')
 
-def calculate_text_statistics(tokens_list):
+def calculate_tokens_statistics(tokens_list):
     """Calcule les statistiques pour une liste de tokens."""
     total_tokens = sum(len(tokens) for tokens in tokens_list)
     unique_tokens = len(set(token for sublist in tokens_list for token in sublist))
