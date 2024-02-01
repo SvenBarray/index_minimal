@@ -10,7 +10,7 @@ def load_json_data(filepath):
 
 def tokenize_texts(texts):
     """Fonction pour tokeniser les textes"""
-    return [word_tokenize(text) for text in texts]
+    return list(map(word_tokenize, texts))
 
 def calculate_token_statistics(tokens):
     """Fonction pour calculer les statistiques des tokens"""
@@ -18,73 +18,49 @@ def calculate_token_statistics(tokens):
     average_tokens = total_tokens / len(tokens)
     return total_tokens, average_tokens
 
-def calculate_statistics(data, titles_tokens, fields_stats=True, extract_metadata=True):
-    """
-    Fonction pour afficher les statistiques de nos données
-    Il y a une redondance des paramètres avec titles_tokens (issus de data), mais cela permet d'éviter de tokeniser les titres deux fois
+def calculate_statistics(token_dict, extract_metadata=True):
+    """Calculer les statistiques pour un dictionnaire de listes de tokens."""
+    statistics = {}
+    all_tokens = []
 
-    field_stats: détermine si on veut également les statistiques du contenu et des headers. Si False, on aura seulement les données des titres. L'option est proposée car cette opération est coûteuse en temps
-    extract_metadata: détermine si on extrait les statistiques calculées en tant que metadonnées dans un fichier metadata.json
-    """
-    num_documents = len(data)
+    # Calculer le nombre total de documents pour la première clé disponible dans token_dict
+    nb_documents = len(token_dict[next(iter(token_dict))] if token_dict else 0)
+    statistics['global'] = {'total_documents': nb_documents}
 
-    total_tokens_titles, avg_tokens_titles = calculate_token_statistics(titles_tokens)
-    titles_unique_tokens = len(set([token for sublist in titles_tokens for token in sublist]))
-    titles_lexical_diversity = titles_unique_tokens / total_tokens_titles if total_tokens_titles else 0
-    df = pd.DataFrame({'TitleTokens': [len(t) for t in titles_tokens]})
+    # Fusionner tous les tokens pour le calcul global
+    for tokens_list in token_dict.values():
+        all_tokens.extend(tokens_list)
 
-    statistics = {
-        'global': {'total_documents': num_documents},
-        'titles': {
-            'total_tokens': total_tokens_titles,
-            'avg_tokens_per_document': avg_tokens_titles,
-            'unique_tokens': titles_unique_tokens,
-            'lexical_diversity': titles_lexical_diversity
-        }
-    }
+    # Ajouter les statistiques globales (à l'exception de total_documents déjà ajouté)
+    global_stats = calculate_text_statistics(all_tokens)
+    global_stats.pop('nb_documents', None)  # Retirer total_documents si présent
+    statistics['global'].update(global_stats)
 
-    if fields_stats:
-        contents = [doc['content'] for doc in data]
-        contents_tokens = tokenize_texts(contents)
-        total_tokens_contents, avg_tokens_contents = calculate_token_statistics(contents_tokens)
-        contents_unique_tokens = len(set([token for sublist in contents_tokens for token in sublist]))
-        contents_lexical_diversity = contents_unique_tokens / total_tokens_contents if total_tokens_contents else 0
-        df['ContentTokens'] = [len(t) for t in contents_tokens]
-
-        headers = [doc['h1'] for doc in data]
-        headers_tokens = tokenize_texts(headers)
-        total_tokens_headers, avg_tokens_headers = calculate_token_statistics(headers_tokens)
-        headers_unique_tokens = len(set([token for sublist in headers_tokens for token in sublist]))
-        headers_lexical_diversity = headers_unique_tokens / total_tokens_headers if total_tokens_headers else 0
-        df['HeaderTokens'] = [len(t) for t in headers_tokens]
-
-        total_global_tokens = total_tokens_titles + total_tokens_contents + total_tokens_headers
-        avg_global_tokens = total_global_tokens / num_documents
-
-
-        statistics['global'].update({
-            'total_tokens': total_global_tokens,
-            'avg_tokens_per_document': avg_global_tokens
-        })
-        statistics['contents'] = {
-            'total_tokens': total_tokens_contents,
-            'avg_tokens_per_document': avg_tokens_contents,
-            'unique_tokens': contents_unique_tokens,
-            'lexical_diversity': contents_lexical_diversity
-        }
-        statistics['headers'] = {
-            'total_tokens': total_tokens_headers,
-            'avg_tokens_per_document': avg_tokens_headers,
-            'unique_tokens': headers_unique_tokens,
-            'lexical_diversity': headers_lexical_diversity
-        }
+    # Calculer les statistiques pour chaque catégorie de tokens
+    for key, tokens_list in token_dict.items():
+        statistics[key] = calculate_text_statistics(tokens_list)
 
     print("Statistiques sur les données :")
     print(json.dumps(statistics, indent=2))
 
+    # Extraire les statistiques en tant que metadata
     if extract_metadata:
         save_metadata_to_file(statistics, 'metadata.json')
         print("Les statistiques ont été extraites avec succès en tant que metadonnées dans le fichier metadata.json.")
+
+def calculate_text_statistics(tokens_list):
+    """Calculer et retourner les statistiques pour une liste de tokens."""
+    total_tokens = sum(len(tokens) for tokens in tokens_list)
+    unique_tokens = len(set(token for sublist in tokens_list for token in sublist))
+    avg_tokens = total_tokens / len(tokens_list) if tokens_list else 0
+    lexical_diversity = unique_tokens / total_tokens if total_tokens else 0
+
+    return {
+        'total_tokens': total_tokens,
+        'unique_tokens': unique_tokens,
+        'avg_tokens_per_document': avg_tokens,
+        'lexical_diversity': lexical_diversity
+    }
 
 def save_metadata_to_file(metadata, filename):
     """Enregistrement des métadonnées dans un fichier."""
@@ -133,11 +109,20 @@ if __name__ == "__main__":
     path = 'crawled_urls.json'
     data = load_json_data(path)
 
-    titles = [doc['title'] for doc in data]
-    titles_tokens = tokenize_texts(titles)
+    # Tokenisation. Tokeniser les contents est le plus couteux en temps et il est possible de sauter cette étape si on ne veut pas de traitement statistique des contents.
+    titles_tokens = tokenize_texts([doc['title'] for doc in data])
+    contents_tokens = tokenize_texts([doc['content'] for doc in data])
+    headers_tokens = tokenize_texts([doc['h1'] for doc in data])
 
-    # Calculer des statistiques sur nos données et les extraire en tant que métadonnées
-    calculate_statistics(data, titles_tokens, fields_stats=False, extract_metadata=True)
+    # Création d'un dictionnaire dans lequel on met les listes de token que l'on souhaite traiter statistiquement
+    token_dict = {
+        'titles': titles_tokens,
+        'contents': contents_tokens,
+        'headers': headers_tokens
+    }
+
+    # Calcul des statistiques
+    calculate_statistics(token_dict, extract_metadata=True)
 
     # Construire et sauvegarder un index non positionnel sans stemming
     non_pos_index = build_index(titles_tokens, stem_tokens=False, positional=False)
