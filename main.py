@@ -1,25 +1,24 @@
 import json
 from nltk.tokenize import word_tokenize
 from nltk.stem import PorterStemmer
-import pandas as pd
 
 def load_json_data(filepath):
-    """Fonction pour charger les données JSON"""
+    """Charge les données à partir d'un fichier JSON."""
     with open(filepath, 'r', encoding='utf-8') as file:
         return json.load(file)
 
 def tokenize_texts(texts):
-    """Fonction pour tokeniser les textes"""
+    """Tokenise une liste de textes en une liste de listes de tokens."""
     return list(map(word_tokenize, texts))
 
-def calculate_token_statistics(tokens):
-    """Fonction pour calculer les statistiques des tokens"""
-    total_tokens = sum(len(t) for t in tokens)
-    average_tokens = total_tokens / len(tokens)
-    return total_tokens, average_tokens
-
 def calculate_statistics(token_dict, extract_metadata=True):
-    """Calculer les statistiques pour un dictionnaire de listes de tokens."""
+    """
+    Calcule les statistiques pour un dictionnaire de listes de tokens.
+
+    Args:
+        token_dict (dict): Un dictionnaire contenant des listes de tokens, chaque clé représentant une catégorie.
+        extract_metadata (bool, optional): True par défaut. Indique si les statistiques doivent être extraites en tant que métadonnées dans un fichier.
+    """
     statistics = {}
     all_tokens = []
 
@@ -45,11 +44,10 @@ def calculate_statistics(token_dict, extract_metadata=True):
 
     # Extraire les statistiques en tant que metadata
     if extract_metadata:
-        save_metadata_to_file(statistics, 'metadata.json')
-        print("Les statistiques ont été extraites avec succès en tant que metadonnées dans le fichier metadata.json.")
+        save_metadata_to_file(statistics, 'data/output/metadata.json')
 
 def calculate_text_statistics(tokens_list):
-    """Calculer et retourner les statistiques pour une liste de tokens."""
+    """Calcule les statistiques pour une liste de tokens."""
     total_tokens = sum(len(tokens) for tokens in tokens_list)
     unique_tokens = len(set(token for sublist in tokens_list for token in sublist))
     avg_tokens = total_tokens / len(tokens_list) if tokens_list else 0
@@ -62,17 +60,19 @@ def calculate_text_statistics(tokens_list):
         'lexical_diversity': lexical_diversity
     }
 
-def save_metadata_to_file(metadata, filename):
-    """Enregistrement des métadonnées dans un fichier."""
-    with open(filename, 'w', encoding='utf-8') as file:
+def save_metadata_to_file(metadata, path):
+    """Enregistre les métadonnées dans un fichier JSON."""
+    with open(path, 'w', encoding='utf-8') as file:
         json.dump(metadata, file, ensure_ascii=False)
 
 def build_index(tokens_list, stem_tokens=False, positional=False):
     """
     Construit un index, positionnel ou non positionnel, avec ou sans stemming des tokens.
 
-    stem_tokens: Si True, applique le stemming aux tokens.
-    positional: Si True, construit un index positionnel.
+    Args:
+        tokens_list (list): Une liste de listes de tokens.
+        positional (bool, optional): False par défaut. Indique si un index positionnel doit être construit.
+        stem_tokens (bool, optional): False par défaut. Indique si le stemming doit être appliqué aux tokens.
     """
     if stem_tokens:
         stemmer = PorterStemmer()
@@ -96,17 +96,17 @@ def build_index(tokens_list, stem_tokens=False, positional=False):
     return index
 
 def stem_tokens(tokens):
-    """Fonction pour appliquer le stemming aux tokens."""
+    """Applique le stemming aux tokens."""
     stemmer = PorterStemmer()
     return [stemmer.stem(token) for token in tokens]
 
-def save_index_to_file(index, filename):
-    """Fonction pour enregistrer l'index dans un fichier."""
-    with open(filename, 'w', encoding='utf-8') as file:
+def save_index_to_file(index, path):
+    """Enregistre l'index dans un fichier JSON."""
+    with open(path, 'w', encoding='utf-8') as file:
         json.dump(index, file, ensure_ascii=False)
 
 if __name__ == "__main__":
-    path = 'crawled_urls.json'
+    path = 'data/input/crawled_urls.json'
     data = load_json_data(path)
 
     # Tokenisation. Tokeniser les contents est le plus couteux en temps et il est possible de sauter cette étape si on ne veut pas de traitement statistique des contents.
@@ -126,19 +126,16 @@ if __name__ == "__main__":
 
     # Construire et sauvegarder un index non positionnel sans stemming
     non_pos_index = build_index(titles_tokens, stem_tokens=False, positional=False)
-    save_index_to_file(non_pos_index, 'title.non_pos_index.json')
+    save_index_to_file(non_pos_index, 'data/output/title.non_pos_index.json')
 
     # Construire et sauvegarder un index non positionnel avec stemming
     stemmed_non_pos_index = build_index(titles_tokens, stem_tokens=True, positional=False)
-    save_index_to_file(stemmed_non_pos_index, 'stemmed_title.non_pos_index.json')
+    save_index_to_file(stemmed_non_pos_index, 'data/output/stemmed_title.non_pos_index.json')
 
     # Construire et sauvegarder un index positionnel sans stemming
     positional_index = build_index(titles_tokens, stem_tokens=False, positional=True)
-    save_index_to_file(positional_index, 'title.pos_index.json')
-
+    save_index_to_file(positional_index, 'data/output/title.pos_index.json')
 
     # Construire et sauvegarder un index positionnel avec stemming pour les headers
-    headers = [doc['h1'] for doc in data]
-    headers_tokens = tokenize_texts(headers)
     stemmed_headers_positional_index = build_index(headers_tokens, stem_tokens=True, positional=True)
-    save_index_to_file(stemmed_headers_positional_index, 'stemmed_headers.pos_index.json')
+    save_index_to_file(stemmed_headers_positional_index, 'data/output/stemmed_headers.pos_index.json')
