@@ -18,12 +18,12 @@ def calculate_token_statistics(tokens):
     average_tokens = total_tokens / len(tokens)
     return total_tokens, average_tokens
 
-def calculate_statistics(data, titles_tokens, fields_stats=False, extract_metadata=True):
+def calculate_statistics(data, titles_tokens, fields_stats=True, extract_metadata=True):
     """
-    Fonction pour afficher les statistiques de nos données. 
-    Il y a une redondance des paramètres avec titles_tokens (issus de data), mais cela permet d'éviter de tokeniser les titres deux fois.
+    Fonction pour afficher les statistiques de nos données
+    Il y a une redondance des paramètres avec titles_tokens (issus de data), mais cela permet d'éviter de tokeniser les titres deux fois
 
-    field_stats: détermine si on veut également les statistiques du contenu et des headers. Si False, on aura seulement les données des titres. False par défaut car cette opération est coûteuse en temps
+    field_stats: détermine si on veut également les statistiques du contenu et des headers. Si False, on aura seulement les données des titres. L'option est proposée car cette opération est coûteuse en temps
     extract_metadata: détermine si on extrait les statistiques calculées en tant que metadonnées dans un fichier metadata.json
     """
     num_documents = len(data)
@@ -150,3 +150,10 @@ if __name__ == "__main__":
     # Construire et sauvegarder un index positionnel sans stemming
     positional_index = build_index(titles_tokens, stem_tokens=False, positional=True)
     save_index_to_file(positional_index, 'title.pos_index.json')
+
+
+    # Construire et sauvegarder un index positionnel avec stemming pour les headers
+    headers = [doc['h1'] for doc in data]
+    headers_tokens = tokenize_texts(headers)
+    stemmed_headers_positional_index = build_index(headers_tokens, stem_tokens=True, positional=True)
+    save_index_to_file(stemmed_headers_positional_index, 'stemmed_headers.pos_index.json')
