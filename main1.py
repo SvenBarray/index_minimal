@@ -70,6 +70,22 @@ def save_index_to_file(index, filename):
     with open(filename, 'w', encoding='utf-8') as file:
         json.dump(index, file, ensure_ascii=False)
 
+def calculate_additional_metadata(titles_tokens):
+    """Calcul des métadonnées supplémentaires pour les titres."""
+    flattened_tokens = [token for sublist in titles_tokens for token in sublist]
+    unique_tokens = set(flattened_tokens)
+    lexical_diversity = len(unique_tokens) / len(flattened_tokens) if flattened_tokens else 0
+
+    metadata = {
+        'total_documents': len(titles_tokens),
+        'total_tokens': len(flattened_tokens),
+    }
+    return metadata
+
+def save_metadata_to_file(metadata, filename):
+    """Enregistrement des métadonnées dans un fichier."""
+    with open(filename, 'w', encoding='utf-8') as file:
+        json.dump(metadata, file, ensure_ascii=False)
 
 if __name__ == "__main__":
     path = 'crawled_urls.json'
@@ -81,3 +97,6 @@ if __name__ == "__main__":
 
     non_pos_index = build_non_positional_index(titles_tokens)
     save_index_to_file(non_pos_index, 'title.non_pos_index.json')
+
+    additional_metadata = calculate_additional_metadata(titles_tokens)
+    save_metadata_to_file(additional_metadata, 'metadata.json')
