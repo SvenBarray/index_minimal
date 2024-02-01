@@ -1,5 +1,6 @@
 import json
 from nltk.tokenize import word_tokenize
+from nltk.stem import PorterStemmer
 import pandas as pd
 
 def load_json_data(filepath):
@@ -17,7 +18,7 @@ def calculate_token_statistics(tokens):
     average_tokens = total_tokens / len(tokens)
     return total_tokens, average_tokens
 
-def calculate_statistics(data, titles_tokens, fields_stats=False, extract_metadata=False):
+def calculate_statistics(data, titles_tokens, fields_stats=False, extract_metadata=True):
     """
     Fonction pour afficher les statistiques de nos données. 
     Il y a une redondance des paramètres avec titles_tokens (issus de data), mais cela permet d'éviter de tokeniser les titres deux fois.
@@ -85,34 +86,67 @@ def calculate_statistics(data, titles_tokens, fields_stats=False, extract_metada
         save_metadata_to_file(statistics, 'metadata.json')
         print("Les statistiques ont été extraites avec succès en tant que metadonnées dans le fichier metadata.json.")
 
-def build_non_positional_index(titles_tokens):
-    """Fonction pour construire l'index non positionnel."""
+def save_metadata_to_file(metadata, filename):
+    """Enregistrement des métadonnées dans un fichier."""
+    with open(filename, 'w', encoding='utf-8') as file:
+        json.dump(metadata, file, ensure_ascii=False)
+
+def build_index(tokens_list, stem_tokens=False, positional=False):
+    """
+    Construit un index, positionnel ou non positionnel, avec ou sans stemming des tokens.
+
+    stem_tokens: Si True, applique le stemming aux tokens.
+    positional: Si True, construit un index positionnel.
+    """
+    if stem_tokens:
+        stemmer = PorterStemmer()
+        tokens_list = [[stemmer.stem(token) for token in tokens] for tokens in tokens_list]
+
     index = {}
-    for doc_id, tokens in enumerate(titles_tokens):
-        for token in tokens:
-            if token not in index:
-                index[token] = []
-            index[token].append(doc_id)
+    for doc_id, tokens in enumerate(tokens_list):
+        for pos, token in enumerate(tokens):
+            if positional:
+                if token not in index:
+                    index[token] = {}
+                if doc_id not in index[token]:
+                    index[token][doc_id] = []
+                index[token][doc_id].append(pos)
+            else:
+                if token not in index:
+                    index[token] = []
+                if doc_id not in index[token]:
+                    index[token].append(doc_id)
+
     return index
+
+def stem_tokens(tokens):
+    """Fonction pour appliquer le stemming aux tokens."""
+    stemmer = PorterStemmer()
+    return [stemmer.stem(token) for token in tokens]
 
 def save_index_to_file(index, filename):
     """Fonction pour enregistrer l'index dans un fichier."""
     with open(filename, 'w', encoding='utf-8') as file:
         json.dump(index, file, ensure_ascii=False)
 
-def save_metadata_to_file(metadata, filename):
-    """Enregistrement des métadonnées dans un fichier."""
-    with open(filename, 'w', encoding='utf-8') as file:
-        json.dump(metadata, file, ensure_ascii=False)
-
 if __name__ == "__main__":
     path = 'crawled_urls.json'
     data = load_json_data(path)
-    titles = [doc['title'] for doc in data]
 
+    titles = [doc['title'] for doc in data]
     titles_tokens = tokenize_texts(titles)
 
-    calculate_statistics(data, titles_tokens, fields_stats=True, extract_metadata=True)
+    # Calculer des statistiques sur nos données et les extraire en tant que métadonnées
+    calculate_statistics(data, titles_tokens, fields_stats=False, extract_metadata=True)
 
-    non_pos_index = build_non_positional_index(titles_tokens)
+    # Construire et sauvegarder un index non positionnel sans stemming
+    non_pos_index = build_index(titles_tokens, stem_tokens=False, positional=False)
     save_index_to_file(non_pos_index, 'title.non_pos_index.json')
+
+    # Construire et sauvegarder un index non positionnel avec stemming
+    stemmed_non_pos_index = build_index(titles_tokens, stem_tokens=True, positional=False)
+    save_index_to_file(stemmed_non_pos_index, 'stemmed_title.non_pos_index.json')
+
+    # Construire et sauvegarder un index positionnel sans stemming
+    positional_index = build_index(titles_tokens, stem_tokens=False, positional=True)
+    save_index_to_file(positional_index, 'title.pos_index.json')
